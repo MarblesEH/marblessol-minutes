@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MarblesSol Minutes</title>
+<style>
+:root{font-family:Inter,system-ui,Arial,sans-serif;color-scheme:dark;background:#151d27;color:#e9f1f8}*{box-sizing:border-box}body{margin:0}button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}button,input,select,textarea{border:1px solid #405065;border-radius:6px;background:#222e3b;padding:9px}button:hover{background:#30465a}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #29a9f4}.primary{background:#007dc6;border-color:#1499e4;color:white}.danger{color:#ffb4b4}header{padding:17px 24px;background:#080c11;display:flex;justify-content:space-between;align-items:center;gap:12px}header b{font-size:21px}header b span{color:#39b8ff}.app{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:calc(100vh - 66px)}aside{padding:18px;background:#202b36;border-right:1px solid #354253}main{padding:30px;min-width:0;max-width:1450px;width:100%}.meetings{margin-top:16px;display:grid;gap:7px}.meeting{width:100%;text-align:left;padding:12px}.meeting.active{border-color:#27b0ff;background:#223f55}.meeting small,.hint{display:block;color:#9dafc0;font-size:12px;margin-top:6px}.toolbar,.buttons{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.toolbar{justify-content:space-between}h1{font-size:24px;margin:0 0 16px}.fields{display:flex;flex-wrap:wrap;gap:12px;margin:15px 0 23px}.fields label{display:grid;gap:6px;font-size:13px;color:#b7c9db}.fields input{min-width:210px}.table-wrap{overflow-x:auto;border:1px solid #344454;border-radius:8px}table{border-collapse:collapse;min-width:800px;width:100%;table-layout:fixed}th{font-size:12px;text-align:left;background:#17222c;color:#4eb9fa;letter-spacing:.03em;padding:12px;border-bottom:1px solid #354758}td{border-bottom:1px solid #334250;padding:5px}tr:last-child td{border-bottom:0}td input,td select,td textarea{width:100%;min-width:0;background:transparent;border-color:transparent}td textarea{resize:vertical;min-height:42px}td :is(input,select,textarea):hover{border-color:#44596d}.col-type{width:19%}.col-description{width:43%}.col-owner{width:19%}.col-due{width:15%}.col-delete{width:4%}.remove{border:0;background:transparent;color:#ff9f9f;font-size:19px;padding:3px 8px}.footer{margin-top:14px}.status{font-size:12px;color:#80d1a5}.empty{color:#9dafc0;padding:50px;text-align:center}.hidden{display:none!important}#importFile{display:none}@media(max-width:750px){.app{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid #354253}main{padding:16px}.fields input{width:100%}header{padding:14px}.toolbar{align-items:start}h1{font-size:20px}}
+</style>
+</head>
+<body>
+<header><b>Marbles<span>Sol</span> Minutes</b><span class="hint">Simple meeting notes · Saved in this browser</span></header>
+<div class="app">
+<aside>
+  <button class="primary" id="newMeeting">+ New Meeting</button>
+  <div id="meetingList" class="meetings"></div>
+  <hr style="border:0;border-top:1px solid #384b5d;margin:24px 0">
+  <div class="buttons"><button id="exportBtn">Export backup</button><button id="importBtn">Import backup</button><input id="importFile" type="file" accept=".json,application/json"></div>
+  <p class="hint">Auto-save is local to this browser only. Export backups regularly. This is not cloud synchronization.</p>
+</aside>
+<main>
+  <section id="empty" class="empty">Select a meeting or create a new one.</section>
+  <section id="editor" class="hidden">
+    <div class="toolbar"><h1>Meeting Minutes</h1><div class="buttons"><span id="saved" class="status">Saved</span><button id="copyBtn">Copy minutes</button><button class="danger" id="deleteMeeting">Delete meeting</button></div></div>
+    <div class="fields"><label>Meeting title<input id="title" placeholder="Customer meeting"></label><label>Date<input id="date" type="date"></label></div>
+    <div class="table-wrap"><table><thead><tr><th class="col-type">TYPE</th><th class="col-description">DESCRIPTION</th><th class="col-owner">ASSIGNEES</th><th class="col-due">DUE</th><th class="col-delete"></th></tr></thead><tbody id="pointRows"></tbody></table></div>
+    <div class="footer buttons"><button class="primary" id="addPoint">+ Add point</button><span class="hint">Click any cell to edit. Every change is saved automatically.</span></div>
+  </section>
+</main>
+</div>
+<script>
+(function(){
+'use strict';
+const KEY='marblessol_minutes_v2';
+const types=['Action','Bet','Celebration','Decision','Discussion','Goal','Information','Presentation','Question','Review','Risk','Update'];
+const $=id=>document.getElementById(id);
+let meetings=[],selected=null;
+const uuid=()=>window.crypto&&crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(36).slice(2);
+const today=()=>new Date().toISOString().slice(0,10);
+function normalise(raw){if(!Array.isArray(raw))return [];return raw.filter(x=>x&&typeof x==='object').map(x=>({id:String(x.id||uuid()),title:String(x.title||x.name||'Untitled meeting'),date:String(x.date||today()).slice(0,10),points:(Array.isArray(x.points)?x.points:[]).filter(Boolean).map(p=>({id:String(p.id||uuid()),type:types.includes(p.type)?p.type:'Discussion',description:String(p.description||''),assignee:String(p.assignee||p.assignees||''),due:String(p.due||'').slice(0,10)}))}));}
+try{meetings=normalise(JSON.parse(localStorage.getItem(KEY)||'[]'));}catch(e){meetings=[];}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(meetings));$('saved').textContent='Saved automatically';}catch(e){$('saved').textContent='Could not save — export a backup';}}
+function current(){return meetings.find(m=>m.id===selected);}
+function element(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;}
+function field(tag,value,fn){const e=document.createElement(tag);e.value=value||'';e.addEventListener('input',()=>{fn(e.value);save();});e.addEventListener('change',()=>{fn(e.value);save();});return e;}
+function drawList(){const holder=$('meetingList');holder.replaceChildren();meetings.forEach(m=>{const b=element('button','meeting'+(m.id===selected?' active':''));b.append(element('strong','',m.title),element('small','',m.date+' · '+m.points.length+' points'));b.onclick=()=>{selected=m.id;draw();};holder.append(b);});}
+function drawRows(){const m=current();if(!m)return;const body=$('pointRows');body.replaceChildren();m.points.forEach(p=>{const tr=element('tr');const type=element('select');types.forEach(t=>{const opt=element('option','',t);opt.value=t;type.append(opt);});type.value=p.type;type.onchange=()=>{p.type=type.value;save();};const desc=field('textarea',p.description,v=>p.description=v);desc.placeholder='Type a meeting point...';desc.rows=1;const owner=field('input',p.assignee,v=>p.assignee=v);owner.placeholder='Assignee';const due=field('input',p.due,v=>p.due=v);due.type='date';const remove=element('button','remove','×');remove.title='Delete point';remove.onclick=()=>{m.points=m.points.filter(x=>x.id!==p.id);save();drawRows();drawList();};[type,desc,owner,due,remove].forEach(el=>{const td=element('td');td.append(el);tr.append(td);});body.append(tr);});}
+function draw(){drawList();const m=current();$('empty').classList.toggle('hidden',!!m);$('editor').classList.toggle('hidden',!m);if(!m)return;$('title').value=m.title;$('date').value=m.date;drawRows();}
+$('newMeeting').onclick=()=>{const m={id:uuid(),title:'New Meeting',date:today(),points:[]};meetings.unshift(m);selected=m.id;save();draw();$('title').focus();$('title').select();};
+$('title').oninput=e=>{const m=current();if(!m)return;m.title=e.target.value;save();drawList();};
+$('date').onchange=e=>{const m=current();if(!m)return;m.date=e.target.value;save();drawList();};
+$('addPoint').onclick=()=>{const m=current();if(!m)return;m.points.push({id:uuid(),type:'Discussion',description:'',assignee:'',due:''});save();drawRows();drawList();const fields=$('pointRows').querySelectorAll('textarea');fields[fields.length-1].focus();};
+$('deleteMeeting').onclick=()=>{const m=current();if(!m||!confirm('Delete this meeting and all its points?'))return;meetings=meetings.filter(x=>x.id!==m.id);selected=meetings[0]?.id||null;save();draw();};
+$('copyBtn').onclick=async()=>{const m=current();if(!m)return;const txt=[m.title,m.date,'',...m.points.map(p=>'['+p.type+'] '+p.description+(p.assignee?' | Owner: '+p.assignee:'')+(p.due?' | Due: '+p.due:''))].join('\n');try{await navigator.clipboard.writeText(txt);alert('Minutes copied.');}catch(e){prompt('Copy minutes:',txt);}};
+$('exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify(meetings,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='marblessol-minutes-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+$('importBtn').onclick=()=>$('importFile').click();
+$('importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(!Array.isArray(data))throw Error('Expected an array of meetings');if(!confirm('Import backup and replace meetings stored in this browser?'))return;meetings=normalise(data);selected=meetings[0]?.id||null;save();draw();}catch(err){alert('Could not import backup: '+err.message);}finally{e.target.value='';}};
+selected=meetings[0]?.id||null;draw();
+})();
+</script>
+</body></html>
